@@ -231,7 +231,7 @@ pp_int$iode_quality_flag  <-with(pp_int,
 pp_int <- pp_int %>%
   select(cruise, date_time_utc, latitude, longitude, station, cast, filter_size, integrated_npp_mg_m2_day, iode_quality_flag)
 
-#add beam attenuation information 
+#add beam attenuation information from output files obtained using automated calculations in MATLBAB. See this Github page for more details: https://github.com/pmarrec/nes-lter-kd-calculation. The "extinction coefficient.csv" file is a file made by compiling output files from here: https://github.com/pmarrec/nes-lter-kd-calculation/tree/main/output_files
 ext <- read_csv("extinction_coefficients.csv")
 
 #join extinc coefficents with integrated table
@@ -243,6 +243,7 @@ pp_int$integrated_npp_mg_m2_day <- round(pp_int$integrated_npp_mg_m2_day, digits
 pp_int$latitude <- round(pp_int$latitude, digits = 4)
 pp_int$longitude <- round(pp_int$longitude, digits = 4)
 
+
 #change T and Z for time/date
 pp_int$date_time_utc <- str_replace(pp_int$date_time_utc, "T", " ")
 
@@ -250,13 +251,14 @@ pp_int$date_time_utc <- str_replace(pp_int$date_time_utc, "T", " ")
 pp_int_vers1 <- pp_int %>%
   filter(cruise %in% c("EN644", "AR39B", "EN649"))
 
-#selecting for version2
-pp_int_vers2 <- pp_int %>%
-  filter(cruise %in% c("EN655","EN657"))
+#reorder cruises chronological
+pp_int$cruise <- fct_relevel(pp_int$cruise, c("EN644", "AR39B","EN649", "EN655", "EN657"))
+pp_int <- pp_int %>%
+  arrange(cruise)
 
 #write_csv
 write_csv(pp_int_vers1 , "For_EDI/npp_integrated_version1.csv")
-write_csv(pp_int_vers2 , "For_EDI/npp_integrated_version2.csv")
+write_csv(pp_int, "For_EDI/npp_integrated_version2.csv")
 
 
 

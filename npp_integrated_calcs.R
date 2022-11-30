@@ -1,35 +1,39 @@
 ### Generate integrated npp rates
-# Input: npp_discrete.csv that has the calculated pp_rates by depth and it an upstream product from the "npp_discrete_calcs.R" file
-# Output: integrated_pp.csv which is the size-fractionated integrated npp rates per station per cruise and has associated extinction coefficient data
+# Input: npp_discrete.csv that has the calculated pp_rates by depth and it an upstream product from the "npp_discrete_calcs.R" file. Note that there are two versions to this file. Version 1: EN644 - EN649 and Version 2: EN655 - EN687.
+# Output: integrated_pp.csv (with versions) which is the size-fractionated integrated npp rates per station per cruise and has associated extinction coefficient data
 
 #load libraries
-(library(tidyverse))
+library(tidyverse)
+library(dplyr)
+
 
 #read in data
 pp_vers1 <- read_csv("For_EDI/npp_discrete_version1.csv")
 pp_vers2 <- read_csv("For_EDI/npp_discrete_version2.csv")
 
-pp <- rbind(pp_vers1, pp_vers2)
+pp_for_int <- rbind(pp_vers1, pp_vers2)
 
 #Create a no reps df and averaged by replicate
-pp_filt <- pp %>%
-  filter(!grepl('NatAbun', alternate_sample_category)) %>% #filter out NatAbun rows 
-  filter(!grepl('Dark', alternate_sample_category)) %>% #filter out Dark rows 
-  select(date_time_utc, cruise, cast, nearest_station, latitude, longitude, niskin, alternate_sample_category, filter_size, replicate, depth, depth_category, npp_rate)
+pp_filt <- pp_for_int %>%
+  filter(!grepl('NatAbun', alternate_sample_ID)) %>% #filter out NatAbun rows 
+  filter(!grepl('Dark', alternate_sample_ID)) %>% #filter out Dark rows 
+  select(date_time_utc, cruise, cast, nearest_station, latitude, longitude, niskin, alternate_sample_ID, filter_size, replicate, depth, depth_category, npp_rate)
 
 #npp_discrete data file doesn't have nearest station fo EN644 L8 so need to add that in somehow 
 #can do it from light csv
 
 light <- read_csv("light_data.csv")
+#add "L" before each station value
+light$station <- sub("^","L",light$station )
 light$cast <- as.numeric(light$cast)
 
 #join light data and pp_filt together
 pp_filt <- pp_filt %>%
-  left_join(light, by = c("cruise", "cast", "niskin"))
+  left_join(light, by = c("cruise", "cast", "niskin", "nearest_station" = "station"))
 
 #Now get averaging for those samples that have replicates
 pp_filt_noreps <- pp_filt %>%
-  group_by(cruise, cast, niskin, station,filter_size, depth, depth_category) %>%
+  group_by(cruise, cast, niskin, nearest_station,filter_size, depth, depth_category) %>%
   summarise(mean_pp = mean(npp_rate)) %>%
   pivot_wider(id_cols = cruise:depth_category,
               names_from = filter_size,
@@ -40,7 +44,7 @@ pp_filt_noreps <- pp_filt %>%
 for_int_all <- pp_filt_noreps %>%
   #here you need to input the cruise name through a variable
   ungroup() %>%
-  select(cruise, cast, station, depth, depth_category, `>0`,`>0&<5`,`>0&<20`) #Not including <10 here because these values only exist at the surface so they cannot be integrated according to this method
+  select(cruise, cast, nearest_station, depth, depth_category, `>0`,`>0&<5`,`>0&<20`) #Not including <10 here because these values only exist at the surface so they cannot be integrated according to this method
 
 #Need to add a '0' for depth for each cruise for each station to be able to integrate later
 for_int_all_subset <- for_int_all %>%
@@ -63,7 +67,7 @@ cruisecounts <- for_int_all %>% #START with the cruise that has the longest # of
   count(cruise)
 
 stnlength <- for_int_all %>% #START with the cruise that has the longest # of stations
-  select(cruise, station)%>%
+  select(cruise, nearest_station)%>%
   ungroup() %>%
   unique() %>%
   count(cruise)
@@ -91,21 +95,21 @@ for (ii in 1:length(cruisename$cruise)){
   #here you define a variable, that changes with the for loop, that contains the name of the cruise to be worked on for this for-loop step
   for_int <- for_int_all %>%
     filter(cruise == cruisename$cruise[ii]) %>%
-    arrange(station) #Arrange dataframe so that the stations are in order for the cruise.
+    arrange(nearest_station) #Arrange dataframe so that the stations are in order for the cruise.
   
   
   STATION <- for_int %>% #START with the cruise that has the longest # of stations
-    select(station) %>%
+    select(nearest_station) %>%
     unique()
   
   
-  PPt_stations[1:length(STATION$station),ii] = arrange(STATION, station) #Helps keep track of the order of the PP values
+  PPt_stations[1:length(STATION$nearest_station),ii] = arrange(STATION, nearest_station) #Helps keep track of the order of the PP values
   
-  n_station <- length(STATION$station) #Determine the length of STATION, in this case, it's 7 and assign that to "n_station"
+  n_station <- length(STATION$nearest_station) #Determine the length of STATION, in this case, it's 7 and assign that to "n_station"
   
   
   for (n1 in 1:n_station) { #this is the start of the loop--looping through the list of 1:n_station
-    a1 = which(for_int$station == STATION$station[n1]); #searching the for_int$station column for instances where that column has values that match those in the STATION variable and assigning to a1, the index
+    a1 = which(for_int$nearest_station == STATION$nearest_station[n1]); #searching the for_int$station column for instances where that column has values that match those in the STATION variable and assigning to a1, the index
     less_5_a1 = for_int$`>0&<5`[a1] #Selecting the row in the for_int$less_5 column (less_5 production) that matches to the a1 index which signifies each station and assigning this to "less_5_a1"
     less_20_a1 = for_int$`>0&<20`[a1]
     GFF_a1 = for_int$`>0`[a1]
@@ -135,41 +139,41 @@ for (ii in 1:length(cruisename$cruise)){
   }
   
   if (ii == 1) {
-    int_prod_less5 <- data.frame(matrix(cruisename$cruise[ii],ncol = 1, nrow = length(STATION$station)))
+    int_prod_less5 <- data.frame(matrix(cruisename$cruise[ii],ncol = 1, nrow = length(STATION$nearest_station)))
     colnames(int_prod_less5) <- "cruise"
-    int_prod_less5$stn <- STATION$station
-    int_prod_less5$pp_less5 <- PPt_less5[1:length(STATION$station),ii]
+    int_prod_less5$stn <- STATION$nearest_station
+    int_prod_less5$pp_less5 <- PPt_less5[1:length(STATION$nearest_station),ii]
     
-    int_prod_less_20 <- data.frame(matrix(cruisename$cruise[ii],ncol = 1, nrow = length(STATION$station)))
+    int_prod_less_20 <- data.frame(matrix(cruisename$cruise[ii],ncol = 1, nrow = length(STATION$nearest_station)))
     colnames(int_prod_less_20) <- "cruise"
-    int_prod_less_20$stn <- STATION$station
-    int_prod_less_20$pp_less_20 <- PPt_less_20[1:length(STATION$station),ii]
+    int_prod_less_20$stn <- STATION$nearest_station
+    int_prod_less_20$pp_less_20 <- PPt_less_20[1:length(STATION$nearest_station),ii]
     
-    int_prod_GFF <- data.frame(matrix(cruisename$cruise[ii],ncol = 1, nrow = length(STATION$station)))
+    int_prod_GFF <- data.frame(matrix(cruisename$cruise[ii],ncol = 1, nrow = length(STATION$nearest_station)))
     colnames(int_prod_GFF) <- "cruise"
-    int_prod_GFF$stn <- STATION$station
-    int_prod_GFF$pp_GFF <- PPt_GFF[1:length(STATION$station),ii]
+    int_prod_GFF$stn <- STATION$nearest_station
+    int_prod_GFF$pp_GFF <- PPt_GFF[1:length(STATION$nearest_station),ii]
   }
   
   else {
-    sacrificial <- data.frame(matrix(cruisename$cruise[ii],ncol = 1, nrow = length(STATION$station)))
+    sacrificial <- data.frame(matrix(cruisename$cruise[ii],ncol = 1, nrow = length(STATION$nearest_station)))
     colnames(sacrificial) <- "cruise"
-    sacrificial$stn <- STATION$station
-    sacrificial$pp_less5 <- PPt_less5[1:length(STATION$station),ii]
+    sacrificial$stn <- STATION$nearest_station
+    sacrificial$pp_less5 <- PPt_less5[1:length(STATION$nearest_station),ii]
     
     int_prod_less5 <- rbind(int_prod_less5, sacrificial)
     
-    sacrificial20 <- data.frame(matrix(cruisename$cruise[ii],ncol = 1, nrow = length(STATION$station)))
+    sacrificial20 <- data.frame(matrix(cruisename$cruise[ii],ncol = 1, nrow = length(STATION$nearest_station)))
     colnames(sacrificial20) <- "cruise"
-    sacrificial20$stn <- STATION$station
-    sacrificial20$pp_less_20 <- PPt_less_20[1:length(STATION$station),ii]
+    sacrificial20$stn <- STATION$nearest_station
+    sacrificial20$pp_less_20 <- PPt_less_20[1:length(STATION$nearest_station),ii]
     
     int_prod_less_20 <- rbind(int_prod_less_20, sacrificial20)
     
-    sacrificial_GFF <- data.frame(matrix(cruisename$cruise[ii],ncol = 1, nrow = length(STATION$station)))
+    sacrificial_GFF <- data.frame(matrix(cruisename$cruise[ii],ncol = 1, nrow = length(STATION$nearest_station)))
     colnames(sacrificial_GFF) <- "cruise"
-    sacrificial_GFF$stn <- STATION$station
-    sacrificial_GFF$pp_GFF <- PPt_GFF[1:length(STATION$station),ii]
+    sacrificial_GFF$stn <- STATION$nearest_station
+    sacrificial_GFF$pp_GFF <- PPt_GFF[1:length(STATION$nearest_station),ii]
     
     int_prod_GFF <- rbind(int_prod_GFF, sacrificial_GFF)
   }
@@ -198,14 +202,15 @@ pp_int$filter_size[pp_int$filter_size == "pp_less_20"] <- ">0&<20"
 # Make stations dataframe to get cast info
 stns <-  pp_filt_noreps %>%
   ungroup()%>%
-  select(cruise, station, cast) %>%
+  select(cruise, nearest_station, cast) %>%
+  rename(station = nearest_station) %>%
   distinct()
 
 pp_int <- pp_int %>%
   inner_join(stns, by = c("cruise","station"))
 
 #Then need date/time and lat/long so use pp dataframe
-lat_lon_date <- pp %>%
+lat_lon_date <- pp_for_int %>%
   select(cruise, cast, latitude, longitude, date_time_utc) %>%
   dplyr::group_by(cruise, cast) %>%
   dplyr::summarise(mean_date = mean(date_time_utc), #get mean info by cruise and cast
@@ -222,6 +227,7 @@ pp_int <- pp_int %>%
          latitude = mean_lat,
         longitude = mean_long)
 
+
 #Add quality flag
 pp_int$iode_quality_flag  <-with(pp_int,
                                  ifelse(integrated_npp_mg_m2_day< 0, "3",
@@ -233,6 +239,7 @@ pp_int <- pp_int %>%
 
 #add beam attenuation information from output files obtained using automated calculations in MATLBAB. See this Github page for more details: https://github.com/pmarrec/nes-lter-kd-calculation. The "extinction coefficient.csv" file is a file made by compiling output files from here: https://github.com/pmarrec/nes-lter-kd-calculation/tree/main/output_files
 ext <- read_csv("extinction_coefficients.csv")
+ext$station <- as.character(ext$station)
 
 #join extinc coefficents with integrated table
 pp_int <- pp_int %>%
@@ -247,18 +254,23 @@ pp_int$longitude <- round(pp_int$longitude, digits = 4)
 #change T and Z for time/date
 pp_int$date_time_utc <- str_replace(pp_int$date_time_utc, "T", " ")
 
+#reorder cruises chronological
+pp_int$cruise <- fct_relevel(pp_int$cruise, c("EN644", "AR39B","EN649", "EN655", "EN657", "EN661", "EN668", "AR61B", "AT46", "EN687"))
+pp_int <- pp_int %>%
+  arrange(cruise)
+
 #selecting for version1
 pp_int_vers1 <- pp_int %>%
   filter(cruise %in% c("EN644", "AR39B", "EN649"))
 
-#reorder cruises chronological
-pp_int$cruise <- fct_relevel(pp_int$cruise, c("EN644", "AR39B","EN649", "EN655", "EN657"))
-pp_int <- pp_int %>%
-  arrange(cruise)
+pp_int_vers2 <- pp_int %>%
+  filter(cruise %in% c("EN655", "EN657", "EN661", "EN668", "AR61B", "AT46", "EN687"))
+
+
 
 #write_csv
 write_csv(pp_int_vers1 , "For_EDI/npp_integrated_version1.csv")
-write_csv(pp_int, "For_EDI/npp_integrated_version2.csv")
+write_csv(pp_int_vers2, "For_EDI/npp_integrated_version2.csv")
 
 
 

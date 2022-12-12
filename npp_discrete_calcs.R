@@ -12,8 +12,12 @@ npp_discrete2 <- read_csv("For_EDI/raw_data_table_version2.csv")
 
 npp_discrete <- rbind(npp_discrete1,npp_discrete2)
 
+#filter out "D4_10_exclude" row
+npp_discrete <- npp_discrete %>%
+  filter(alternate_sample_category != "D4_10_exclude")
+
 #Make sample ID character
-npp_discrete$alternate_sample_ID <- as.character(npp_discrete$alternate_sample_ID)
+npp_discrete$alternate_sample_category <- as.character(npp_discrete$alternate_sample_category)
 
 #Make cruise a factor
 npp_discrete$cruise <- as.factor(npp_discrete$cruise)
@@ -21,7 +25,7 @@ npp_discrete$cruise <- as.factor(npp_discrete$cruise)
 
 #filter for the sample type of "filter blank" so that I can subtract the blank POC value from the measured values to get a "blank corrected POC" value
 filt_blank <- npp_discrete %>%
-  filter(alternate_sample_ID == "Filter_blank")
+  filter(alternate_sample_category == "Filter_blank")
 
 
 #there was a contamination issue with the filter blanks from cruise EN644 so these filter blanks were not included in the average. Instead, I averaged the filter blank values from the other cruises and used this value for the EN644 cruise
@@ -38,7 +42,7 @@ filt_blank <- filt_blank_noen644 %>%
  
 #add a column of blank corrected POC values
 npp_discrete <- npp_discrete %>%
-  filter(alternate_sample_ID != "Filter_blank") %>%
+  filter(alternate_sample_category != "Filter_blank") %>%
   left_join(filt_blank, by = "cruise") %>%
   mutate(blank_cor_POC_mg = massC_mg - mean_blank) %>%
   mutate(POC_ug = blank_cor_POC_mg * 1000) #multiply the POC by 1000 to get into µg
@@ -58,29 +62,29 @@ npp_discrete <- npp_discrete %>%
   mutate(at_per = 100*VPDB*((d13C/1000+1))/(1+(VPDB*(d13C/1000+1))))
 
 #need to get the natural abundance samples by themselves
-nat <- npp_discrete[str_detect(npp_discrete$alternate_sample_ID, "NatAbun"), ]
+nat <- npp_discrete[str_detect(npp_discrete$alternate_sample_category, "NatAbun"), ]
 
 #need to add a row for L7bloom natabun sample since this wasn't collected (I decided to use the natural abundance sample from L6)
-nat_L6en668 <- nat %>%
-  filter(cruise == "EN668") %>%
-  filter(station == 6) %>%
-  select(at_per)
-nat_L6en668 <- as.numeric(nat_L6en668)
+#nat_L6en668 <- nat %>%
+ # filter(cruise == "EN668") %>%
+  #filter(station == 6) %>%
+  #select(at_per)
+#nat_L6en668 <- as.numeric(nat_L6en668)
 
 #select cast
-nat_L6en668_cast <- nat %>%
-  filter(cruise == "EN668") %>%
-  filter(station == 6) %>%
-  select(cast)
-nat_L6en668_cast <- as.numeric(nat_L6en668_cast)
+#nat_L6en668_cast <- nat %>%
+ # filter(cruise == "EN668") %>%
+ # filter(station == 6) %>%
+ # select(cast)
+#nat_L6en668_cast <- as.numeric(nat_L6en668_cast)
 
 
 #just need certain columns
 nat <- nat %>%
-  select(cruise, cast, station, at_per)
+ select(cruise, cast, station, at_per)
 
-nat <- nat %>%
-  add_row(cruise = "EN668", station = "7bloom", cast = nat_L6en668_cast, at_per =  nat_L6en668)
+#nat <- nat %>%
+  #add_row(cruise = "EN668", station = "7bloom", cast = nat_L6en668_cast, at_per =  nat_L6en668)
 
 
 
@@ -190,16 +194,30 @@ npp_calcs$iode_quality_flag <-with(npp_calcs,
                                    ifelse(pp_rate < 0, "3",
                                           ifelse(pp_rate >0, "1",NA))) #Note there will be no quality flag for natural abundance samples
 
+##D1 values from EN668 cast 20 (d6a) did not have 200um mesh (wasn't sampled properly). make the qual flag a 4 and make the values an NA
+npp_en668_D1_forqual <- npp_calcs %>%
+  filter(cruise == "EN668" & depth_category == "D1" & cast == "20")
+
+npp_en668_D1_forqual$iode_quality_flag <- 9
+npp_en668_D1_forqual$pp_rate <- NA
+
+
+#rbind dataframe back together and filter out D4 10 exclude row and en668 d6a (cast 20) D1 samples since we binded them together (we don't want duplicate rows for the same samples)
+npp_calcs_joined <- rbind(npp_calcs, npp_en668_D1_forqual)
+
+npp_calcs_joined <- npp_calcs_joined %>%
+  filter(!(cruise == "EN668" & cast == "20" & depth_category == "D1" & iode_quality_flag == 1))
+  
+
 
 ### Using station list to obtain nearest station info for discrete depth table
-npp_dis <- npp_calcs
+npp_dis <- npp_calcs_joined
 # initialize nearest station and distance columns to NA
 npp_dis$nearest_station <- NA_character_
 npp_dis$distance <- NA_integer_
-# use a standard list of stations L1-L13
-# read list csv into stations
-stations <- read_csv('https://raw.githubusercontent.com/WHOIGit/nes-lter-chl-transect/master/NES-LTER_standard_stations_201808.csv')
-station_matrix <- matrix(data = c(stations$longitude, stations$latitude), nrow = 14, ncol = 2, byrow = FALSE,
+# read list csv into stations. using 668 station list because this has all the stations whereas the other master one doesn't
+stations <- read_csv('https://nes-lter-data.whoi.edu/api/stations/en668.csv')
+station_matrix <- matrix(data = c(stations$longitude, stations$latitude), nrow = 25, ncol = 2, byrow = FALSE,
                          dimnames = NULL)
 # calculate distance per row of the data frame
 for (df_row in 1:nrow(npp_dis)) {
@@ -212,7 +230,7 @@ for (df_row in 1:nrow(npp_dis)) {
     # index the minimum distance
     index <- which.min(km_from_df)
     # use that index to pull the station name and its distance
-    nearest_station_list <- stations[index,'station']
+    nearest_station_list <- stations[index,'name']
     # need to change this from a list to char
     nearest_station <- unname(unlist(nearest_station_list))
     distance <- km_from_df[index]
@@ -240,10 +258,9 @@ npp_dis$longitude <- round(npp_dis$longitude, digits = 4)
 npp_dis <- npp_dis %>%
   filter(depth_category != "NatAbun")
 
-
 #select just what needs to be in the final datasheet
 npp_calcs_final <- npp_dis %>%
-  select(cruise, date_time_utc, cast, niskin,  latitude, longitude, depth, alternate_sample_ID, depth_category, filter_size, replicate, percent_surface_irradiance, npp_rate, iode_quality_flag, nearest_station, distance)
+  select(cruise, date_time_utc, cast, niskin,  latitude, longitude, depth, alternate_sample_category, depth_category, filter_size, replicate, percent_surface_irradiance, npp_rate, iode_quality_flag, nearest_station, distance)
 
 #fix datetime
 npp_calcs_final$date_time_utc <- str_replace(npp_calcs_final$date_time_utc, "T", " ")
@@ -251,24 +268,24 @@ npp_calcs_final$date_time_utc <- str_replace(npp_calcs_final$date_time_utc, "T",
 #need to add new column called "incub_tank" for the experimental samples from en687
 ## for 26 degree experiment
 en687exp_26 <- npp_calcs_final %>%
-  filter(grepl("tank", alternate_sample_ID)) %>%
-  filter(grepl("tank3", alternate_sample_ID))  %>%
+  filter(grepl("tank", alternate_sample_category)) %>%
+  filter(grepl("tank3", alternate_sample_category))  %>%
   mutate(incub_type = "experiment_26deg")
 
 #for 18 degree exp
 en687exp_18 <- npp_calcs_final %>%
-  filter(grepl("tank2", alternate_sample_ID))  %>%
+  filter(grepl("tank2", alternate_sample_category))  %>%
   mutate(incub_type = "experiment_18deg")
 
 #for 14 degree exp
 en687exp_14 <- npp_calcs_final %>%
-  filter(grepl("tank1", alternate_sample_ID)) %>%
+  filter(grepl("tank1", alternate_sample_category)) %>%
   filter(nearest_station %in% c("L6", "L11")) %>%
   mutate(incub_type = "experiment_14deg")
 
 #all the rest that need just "ambient_temp" in the incubation type column
 no_experimental <- npp_calcs_final %>%
-  filter(!grepl("tank", alternate_sample_ID)) %>%
+  filter(!grepl("tank", alternate_sample_category)) %>%
   mutate(incub_type = "ambient_temp")
 
 

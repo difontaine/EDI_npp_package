@@ -30,9 +30,9 @@ npp_raw <- npp_raw %>%
 #make surface irradiance in a % by multiplying by 100
 npp_raw$percent_surface_irradiance <- npp_raw$percent_surface_irradiance*100
 
-#separate alternate_id column
+#separate alternate_category
 npp_raw <- npp_raw %>%
-  separate(alternate_sample_ID, into = c("depth_category", "filter_size"), sep = "_", remove = FALSE)
+  separate(alternate_sample_category, into = c("depth_category", "filter_size"), sep = "_", remove = FALSE)
 
 #all occurence of "GFF" under filter_size should be >0
 npp_raw$filter_size[npp_raw$filter_size=='GFF'] <- ">0"

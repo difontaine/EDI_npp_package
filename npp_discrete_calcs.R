@@ -12,6 +12,11 @@ npp_discrete2 <- read_csv("For_EDI/raw_data_table_version2.csv")
 
 npp_discrete <- rbind(npp_discrete1,npp_discrete2)
 
+#need to change L1.2 and L4.2  to be L1 and L4, respectively
+npp_discrete$station[npp_discrete$station == "L1.2"] <- "L1"
+npp_discrete$station[npp_discrete$station == "L4.2"] <- "L4"
+
+
 #filter out "D4_10_exclude" row
 npp_discrete <- npp_discrete %>%
   filter(alternate_sample_category != "D4_10_exclude")
@@ -209,8 +214,7 @@ npp_calcs_joined <- npp_calcs_joined %>%
   filter(!(cruise == "EN668" & cast == "20" & depth_category == "D1" & iode_quality_flag == 1))
   
 
-
-### Using station list to obtain nearest station info for discrete depth table
+### Using list made above to obtain nearest station info for discrete depth table
 npp_dis <- npp_calcs_joined
 # initialize nearest station and distance columns to NA
 npp_dis$nearest_station <- NA_character_
@@ -258,9 +262,20 @@ npp_dis$longitude <- round(npp_dis$longitude, digits = 4)
 npp_dis <- npp_dis %>%
   filter(depth_category != "NatAbun")
 
+
+#check to make sure station and nearest station match up.
+npp_dis$stncheck <- ifelse(npp_dis$station==npp_dis$nearest_station,"TRUE","FALSE")
+#Here, the false ones are for  L8 when ship drifted closer to u9a. The u9a stations will be manually changed in output table
+
+#check station distance 
+npp_dis$discheck <- ifelse(npp_dis$distance < 2.5,"TRUE","FALSE")
+#range of rows classified as false is from 2.53 - 3.94. result of ship drifting
+
+
 #select just what needs to be in the final datasheet
 npp_calcs_final <- npp_dis %>%
-  select(cruise, date_time_utc, cast, niskin,  latitude, longitude, depth, alternate_sample_category, depth_category, filter_size, replicate, percent_surface_irradiance, npp_rate, iode_quality_flag, nearest_station, distance)
+  select(cruise, date_time_utc, cast, station, niskin,  latitude, longitude, depth, alternate_sample_category, depth_category, filter_size, replicate, percent_surface_irradiance, npp_rate, iode_quality_flag, nearest_station, distance)
+
 
 #fix datetime
 npp_calcs_final$date_time_utc <- str_replace(npp_calcs_final$date_time_utc, "T", " ")
@@ -300,6 +315,7 @@ npp_calcs_final_vers1 <- npp_calcs_final_withincub %>%
 #selecting for version2
 npp_calcs_final_vers2 <- npp_calcs_final_withincub%>%
   filter(cruise %in% c("EN655","EN657", "EN661", "EN668", "AR61B", "AT46", "EN687"))
+
 
 
 

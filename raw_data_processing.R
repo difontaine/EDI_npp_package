@@ -9,6 +9,10 @@ library(tidyverse)
 
 #load light data
 light <- read_csv("light_data.csv")
+light <- light %>%
+  select(-station)
+
+
 npp_raw_vers1 <- read_csv("raw_npp_data_version1.csv")
 npp_raw_vers2 <- read_csv("raw_npp_data_version2.csv")
 
@@ -21,11 +25,10 @@ npp_raw$cast <- as.numeric(npp_raw$cast)
 
 #make light cast numeric
 light$cast <- as.numeric(light$cast)
-light$station <- as.character(light$station)
 
 #Merge to get light data in raw file
 npp_raw <- npp_raw %>%
-  left_join(light, by = c("cruise", "station", "cast", "niskin"))
+  left_join(light, by = c("cruise", "cast", "niskin"))
 
 #make surface irradiance in a % by multiplying by 100
 npp_raw$percent_surface_irradiance <- npp_raw$percent_surface_irradiance*100
@@ -56,11 +59,18 @@ npp_raw$filter_size[npp_raw$filter_size=='NatAbun'] <- ">0"
 npp_raw <- npp_raw %>%
   select(-date)
 
+#need to append "L" to all the station namesbut not for d6a, so filter that one out
+#now add L to all station values
+npp_raw$station<-sub("^","L",npp_raw$station)
+
+#now need to change d6a to be d6a instead of "Ld6a)
+npp_raw$station[npp_raw$station == "Ld6a"] <- "d6a"
+
 #save the two versions of the files
 npp_table_version1 <- npp_raw %>%
   filter(cruise %in% c("EN644", "AR39B", "EN649"))
 
-npp_table_version2 <- npp_raw %>%
+npp_table_version2 <- npp_raw%>%
   filter(!(cruise %in% c("EN644", "AR39B", "EN649")))
 
 #Save as "raw_data_table.csv"-- make sure to save the correct versions

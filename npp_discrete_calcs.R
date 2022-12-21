@@ -203,7 +203,7 @@ npp_calcs$iode_quality_flag <-with(npp_calcs,
 npp_en668_D1_forqual <- npp_calcs %>%
   filter(cruise == "EN668" & depth_category == "D1" & cast == "20")
 
-npp_en668_D1_forqual$iode_quality_flag <- 9
+npp_en668_D1_forqual$iode_quality_flag <- 4
 npp_en668_D1_forqual$pp_rate <- NA
 
 

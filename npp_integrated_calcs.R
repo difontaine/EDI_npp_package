@@ -22,22 +22,6 @@ pp_filt <- pp_for_int %>%
   filter(!grepl('Dark', alternate_sample_category)) %>% #filter out Dark rows 
   select(date_time_utc, cruise, cast, station, latitude, longitude, niskin, alternate_sample_category, filter_size, replicate, depth, depth_category, npp_rate)
 
-#npp_discrete data file doesn't have nearest station fo EN644 L8 so need to add that in somehow 
-#can do it from light csv
-
-light <- read_csv("light_data.csv")
-#add "L" before each station value
-light$cast <- as.numeric(light$cast)
-
-#remove station from light DF
-light <- light %>% 
-  select(-station)
-
-#join light data and pp_filt together
-pp_filt <- pp_filt %>%
-  left_join(light, by = c("cruise", "cast", "niskin"))
-  
-
 #Now get averaging for those samples that have replicates
 pp_filt_noreps <- pp_filt %>%
   group_by(cruise, cast, niskin, station, filter_size, depth, depth_category) %>%

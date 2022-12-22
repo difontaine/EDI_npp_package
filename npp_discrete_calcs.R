@@ -177,8 +177,6 @@ bottles_en687 <- bottles_en687 %>%
 #join bottle data using rbind
 bottles_join<- rbind(bottles_en644, bottles_ar39, bottles_en649, bottles_en655, bottles_en657, bottles_en661, bottles_en668,bottles_ar61, bottles_at46, bottles_en687)
 
-test <- rbind(bottles_en661, bottles_en668)
-
 #make cast for pp dataframe numerical for merging
 pp$cast <- as.numeric(pp$cast)
 
@@ -297,7 +295,7 @@ en687exp_18 <- npp_calcs_final %>%
 #for 14 degree exp
 en687exp_14 <- npp_calcs_final %>%
   filter(grepl("tank1", alternate_sample_category)) %>%
-  filter(nearest_station %in% c("L6", "L11")) %>%
+  filter(station %in% c("L6", "L11")) %>%
   mutate(incub_type = "experiment_14deg")
 
 #all the rest that need just "ambient_temp" in the incubation type column

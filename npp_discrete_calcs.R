@@ -69,28 +69,10 @@ npp_discrete <- npp_discrete %>%
 #need to get the natural abundance samples by themselves
 nat <- npp_discrete[str_detect(npp_discrete$alternate_sample_category, "NatAbun"), ]
 
-#need to add a row for L7bloom natabun sample since this wasn't collected (I decided to use the natural abundance sample from L6)
-#nat_L6en668 <- nat %>%
- # filter(cruise == "EN668") %>%
-  #filter(station == 6) %>%
-  #select(at_per)
-#nat_L6en668 <- as.numeric(nat_L6en668)
-
-#select cast
-#nat_L6en668_cast <- nat %>%
- # filter(cruise == "EN668") %>%
- # filter(station == 6) %>%
- # select(cast)
-#nat_L6en668_cast <- as.numeric(nat_L6en668_cast)
-
 
 #just need certain columns
 nat <- nat %>%
  select(cruise, cast, station, at_per)
-
-#nat <- nat %>%
-  #add_row(cruise = "EN668", station = "7bloom", cast = nat_L6en668_cast, at_per =  nat_L6en668)
-
 
 
 #join raw_pp df with nat df so that each sample has its respective natural abundance values (this value is used in the rate calculation)
@@ -104,11 +86,11 @@ bottles_ar39 <- read_csv('https://nes-lter-data.whoi.edu/api/ctd/ar39b/bottles.c
 bottles_en649 <- read_csv('https://nes-lter-data.whoi.edu/api/ctd/en649/bottles.csv')
 bottles_en655 <- read_csv('https://nes-lter-data.whoi.edu/api/ctd/en655/bottles.csv')
 bottles_en657 <- read_csv('https://nes-lter-data.whoi.edu/api/ctd/en657/bottles.csv')
-bottles_en661 <- read.csv('https://nes-lter-data.whoi.edu/api/ctd/en661/bottles.csv')
-bottles_en668 <- read.csv('https://nes-lter-data.whoi.edu/api/ctd/en668/bottles.csv')
-bottles_ar61 <- read.csv('https://nes-lter-data.whoi.edu/api/ctd/ar61b/bottles.csv')
-bottles_at46 <- read.csv('https://nes-lter-data.whoi.edu/api/ctd/at46/bottles.csv')
-bottles_en687 <- read.csv('https://nes-lter-data.whoi.edu/api/ctd/en687/bottles.csv')
+bottles_en661 <- read_csv('https://nes-lter-data.whoi.edu/api/ctd/en661/bottles.csv')
+bottles_en668 <- read_csv('https://nes-lter-data.whoi.edu/api/ctd/en668/bottles.csv')
+bottles_ar61 <- read_csv('https://nes-lter-data.whoi.edu/api/ctd/ar61b/bottles.csv')
+bottles_at46 <- read_csv('https://nes-lter-data.whoi.edu/api/ctd/at46/bottles.csv')
+bottles_en687 <- read_csv('https://nes-lter-data.whoi.edu/api/ctd/en687/bottles.csv')
 
 
 
@@ -119,11 +101,16 @@ bottles_en644 <- bottles_en644 %>%
          salinity = sal00,
          temp = t090c)
 
+
+
 bottles_ar39 <- bottles_ar39 %>%
   select(date,cruise, cast, niskin, latitude, longitude, prdm, sal00, t090c) %>%
   rename(depth = prdm,
          salinity = sal00,
          temp = t090c)
+
+
+
 
 bottles_en649 <- bottles_en649 %>%
   select(date,cruise, cast, niskin, latitude, longitude, prdm, sal00, t090c) %>%
@@ -131,11 +118,14 @@ bottles_en649 <- bottles_en649 %>%
          salinity = sal00,
          temp = t090c) 
 
+
+
 bottles_en655 <- bottles_en655 %>%
   select(date,cruise, cast, niskin, latitude, longitude, prdm, sal00, t090c) %>%
   rename(depth = prdm,
          salinity = sal00,
          temp = t090c) 
+
 
 bottles_en657 <- bottles_en657 %>%
   select(date,cruise, cast, niskin, latitude, longitude, prdm, sal00, t090c) %>%
@@ -143,11 +133,13 @@ bottles_en657 <- bottles_en657 %>%
          salinity = sal00,
          temp = t090c) 
 
+
 bottles_en661 <- bottles_en661 %>%
   select(date, cruise, cast, niskin, latitude, longitude, prdm, sal00, t090c) %>%
   rename(depth = prdm,
          salinity = sal00,
          temp = t090c)
+
 
 bottles_en668 <- bottles_en668 %>%
   select(date, cruise, cast, niskin, latitude, longitude, prdm, sal00, t090c) %>%
@@ -155,17 +147,23 @@ bottles_en668 <- bottles_en668 %>%
          salinity = sal00,
          temp = t090c)
 
+
+
 bottles_ar61 <- bottles_ar61 %>%
   select(date, cruise, cast, niskin, latitude, longitude, prdm, sal00, t090c) %>%
   rename(depth = prdm,
          salinity = sal00,
          temp = t090c) 
 
+
+
 bottles_at46 <- bottles_at46 %>%
   select(date, cruise, cast, niskin, latitude, longitude, prdm, sal00, t090c) %>%
   rename(depth = prdm,
          salinity = sal00,
          temp = t090c) 
+
+
 
 bottles_en687 <- bottles_en687 %>%
   select(date, cruise, cast, niskin, latitude, longitude, prdm, sal00, t090c) %>%
@@ -174,8 +172,12 @@ bottles_en687 <- bottles_en687 %>%
          temp = t090c) 
 
 
-#join bottle data for en644 and ar39 using rbind
-bottles_join <- rbind(bottles_en644, bottles_ar39, bottles_en649, bottles_en655, bottles_en657, bottles_en661, bottles_en668,bottles_ar61, bottles_at46, bottles_en687)
+
+
+#join bottle data using rbind
+bottles_join<- rbind(bottles_en644, bottles_ar39, bottles_en649, bottles_en655, bottles_en657, bottles_en661, bottles_en668,bottles_ar61, bottles_at46, bottles_en687)
+
+test <- rbind(bottles_en661, bottles_en668)
 
 #make cast for pp dataframe numerical for merging
 pp$cast <- as.numeric(pp$cast)

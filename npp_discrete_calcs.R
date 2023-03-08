@@ -69,6 +69,18 @@ npp_discrete <- npp_discrete %>%
 #need to get the natural abundance samples by themselves
 nat <- npp_discrete[str_detect(npp_discrete$alternate_sample_category, "NatAbun"), ]
 
+#use nat to get natural abundance table
+nat_table <- nat %>%
+  select(cruise, cast, station, depth, niskin, alternate_sample_category, filter_size, vol_filt_L, POC_ug_L)
+
+#order cruises and order table by cruise order
+nat_table$cruise <- fct_relevel(nat_table$cruise , c("EN644", "AR39B","EN649", "EN655", "EN657", "EN661", "EN668", "AR61B", "AT46", "EN687"))
+nat_table<- nat_table %>%
+  arrange(cruise)
+
+#add filter size 
+nat_table$filter_size <- ">0"
+
 
 #just need certain columns
 nat <- nat %>%
@@ -185,6 +197,23 @@ pp$cast <- as.numeric(pp$cast)
 #joining the pp df and the bottles_join df
 pp_cruises <- pp %>%
   left_join(bottles_join, by = c('cruise', 'cast', 'niskin'))
+
+#need to add date, latitude, longitude to natural table
+nat_table_complete <- nat_table %>%
+  left_join(bottles_join, by = c('cruise', 'cast', 'niskin')) %>%
+  select(-temp, -salinity)
+  
+
+#now select columns in order 
+nat_table_complete <- nat_table_complete %>%
+  select(cruise, date, latitude, longitude, cast, niskin, depth, everything())
+
+nat_table_complete$latitude <- round(nat_table_complete$latitude , digits = 3)
+nat_table_complete$longitude <- round(nat_table_complete$longitude, digits = 3)
+nat_table_complete$POC_ug_L <- round(nat_table_complete$POC_ug_L, digits = 3)
+
+#now save csv!
+write_csv(nat_table_complete, "POC_Rynearson.csv")
 
 
 #calculations to get to pp rates

@@ -1,6 +1,6 @@
 ### Generate integrated npp rates
 # Input: npp_discrete.csv that has the calculated pp_rates by depth and it an upstream product from the "npp_discrete_calcs.R" file. Note that there are two versions to this file. Version 1: EN644 - EN649 and Version 2: EN655 - EN687.
-# Output: integrated_pp.csv (with versions) which is the size-fractionated integrated npp rates per station per cruise and has associated extinction coefficient data
+# Output: integrated_pp.csv (with versions) which is the size-fractionated integrated npp rates per cast per cruise and has associated extinction coefficient data
 
 #load libraries
 library(tidyverse)
@@ -20,24 +20,23 @@ pp_for_int <- pp_for_int %>%
 pp_filt <- pp_for_int %>%
   filter(!grepl('NatAbun', alternate_sample_category)) %>% #filter out NatAbun rows 
   filter(!grepl('Dark', alternate_sample_category)) %>% #filter out Dark rows 
-  select(date_time_utc, cruise, cast, station, latitude, longitude, niskin, alternate_sample_category, filter_size, replicate, depth, depth_category, npp_rate)
+  select(date_time_utc, cruise, station, cast, latitude, longitude, niskin, alternate_sample_category, filter_size, replicate, depth, depth_category, npp_rate)
 
 #Now get averaging for those samples that have replicates
 pp_filt_noreps <- pp_filt %>%
-  group_by(cruise, cast, niskin, station, filter_size, depth, depth_category) %>%
+  group_by(cruise, station, niskin, cast, filter_size, depth, depth_category) %>%
   summarise(mean_pp = mean(npp_rate, na.rm = TRUE)) %>%
   pivot_wider(id_cols = cruise:depth_category,
               names_from = filter_size,
               values_from = mean_pp)
 
-
 #Deselect the Dark sample so that can use just the case, stn, depth and different size classes for the production data
 for_int_all <- pp_filt_noreps %>%
   #here you need to input the cruise name through a variable
   ungroup() %>%
-  select(cruise, cast, station, depth, depth_category, `>0`,`>0&<5`,`>0&<20`) #Not including <10 here because these values only exist at the surface so they cannot be integrated according to this method
+  select(cruise, cast, cast, depth, depth_category, `>0`,`>0&<5`,`>0&<20`) #Not including <10 here because these values only exist at the surface so they cannot be integrated according to this method
 
-#Need to add a '0' for depth for each cruise for each station to be able to integrate later
+#Need to add a '0' for depth for each cruise for each cast to be able to integrate later
 for_int_all_subset <- for_int_all %>%
   filter(depth < 8.2)
 
@@ -58,7 +57,7 @@ cruisecounts <- for_int_all %>% #START with the cruise that has the longest # of
   count(cruise)
 
 stnlength <- for_int_all %>% #START with the cruise that has the longest # of stations
-  select(cruise, station)%>%
+  select(cruise, cast)%>%
   ungroup() %>%
   unique() %>%
   count(cruise)
@@ -73,7 +72,7 @@ colnames(PPt_less_20) <- c(cruisename$cruise)
 PPt_GFF <- data.frame(matrix(NA, ncol = ncruise, nrow = max(stnlength$n)))
 colnames(PPt_GFF) <- c(cruisename$cruise)
 
-#station per cruise dataframe to keep track of them
+#cast per cruise dataframe to keep track of them
 PPt_stations <- data.frame(matrix(NA, ncol = ncruise, nrow = max(stnlength$n)))
 colnames(PPt_stations) <- c(cruisename$cruise)
 
@@ -82,26 +81,25 @@ PPt_stations <- PPt_stations %>%
 
 #for loop goes here, it selects which cruise you're dealing with from 1 to 3
 for (ii in 1:length(cruisename$cruise)){
-  
   #here you define a variable, that changes with the for loop, that contains the name of the cruise to be worked on for this for-loop step
   for_int <- for_int_all %>%
     filter(cruise == cruisename$cruise[ii]) %>%
-    arrange(station) #Arrange dataframe so that the stations are in order for the cruise.
+    arrange(cast) #Arrange dataframe so that the stations are in order for the cruise.
   
   
   STATION <- for_int %>% #START with the cruise that has the longest # of stations
-    select(station) %>%
+    select(cast) %>%
     unique()
   
   
-  PPt_stations[1:length(STATION$station),ii] = arrange(STATION, station) #Helps keep track of the order of the PP values
+  PPt_stations[1:length(STATION$cast),ii] = arrange(STATION, cast) #Helps keep track of the order of the PP values
   
-  n_station <- length(STATION$station) #Determine the length of STATION, in this case, it's 7 and assign that to "n_station"
+  n_station <- length(STATION$cast) #Determine the length of STATION, in this case, it's 7 and assign that to "n_station"
   
   
   for (n1 in 1:n_station) { #this is the start of the loop--looping through the list of 1:n_station
-    a1 = which(for_int$station == STATION$station[n1]); #searching the for_int$station column for instances where that column has values that match those in the STATION variable and assigning to a1, the index
-    less_5_a1 = for_int$`>0&<5`[a1] #Selecting the row in the for_int$less_5 column (less_5 production) that matches to the a1 index which signifies each station and assigning this to "less_5_a1"
+    a1 = which(for_int$cast == STATION$cast[n1]); #searching the for_int$cast column for instances where that column has values that match those in the STATION variable and assigning to a1, the index
+    less_5_a1 = for_int$`>0&<5`[a1] #Selecting the row in the for_int$less_5 column (less_5 production) that matches to the a1 index which signifies each cast and assigning this to "less_5_a1"
     less_20_a1 = for_int$`>0&<20`[a1]
     GFF_a1 = for_int$`>0`[a1]
     depth_a1 = for_int$depth[a1] #Selecting the row in the for_int$depth column (depth) that matches to the a1 index assigned above and assigning this to "depth_al"
@@ -130,41 +128,41 @@ for (ii in 1:length(cruisename$cruise)){
   }
   
   if (ii == 1) {
-    int_prod_less5 <- data.frame(matrix(cruisename$cruise[ii],ncol = 1, nrow = length(STATION$station)))
+    int_prod_less5 <- data.frame(matrix(cruisename$cruise[ii],ncol = 1, nrow = length(STATION$cast)))
     colnames(int_prod_less5) <- "cruise"
-    int_prod_less5$station  <- STATION$station
-    int_prod_less5$pp_less5 <- PPt_less5[1:length(STATION$station),ii]
+    int_prod_less5$cast  <- STATION$cast
+    int_prod_less5$pp_less5 <- PPt_less5[1:length(STATION$cast),ii]
     
-    int_prod_less_20 <- data.frame(matrix(cruisename$cruise[ii],ncol = 1, nrow = length(STATION$station)))
+    int_prod_less_20 <- data.frame(matrix(cruisename$cruise[ii],ncol = 1, nrow = length(STATION$cast)))
     colnames(int_prod_less_20) <- "cruise"
-    int_prod_less_20$station  <- STATION$station
-    int_prod_less_20$pp_less_20 <- PPt_less_20[1:length(STATION$station),ii]
+    int_prod_less_20$cast  <- STATION$cast
+    int_prod_less_20$pp_less_20 <- PPt_less_20[1:length(STATION$cast),ii]
     
-    int_prod_GFF <- data.frame(matrix(cruisename$cruise[ii],ncol = 1, nrow = length(STATION$station)))
+    int_prod_GFF <- data.frame(matrix(cruisename$cruise[ii],ncol = 1, nrow = length(STATION$cast)))
     colnames(int_prod_GFF) <- "cruise"
-    int_prod_GFF$station  <- STATION$station
-    int_prod_GFF$pp_GFF <- PPt_GFF[1:length(STATION$station),ii]
+    int_prod_GFF$cast  <- STATION$cast
+    int_prod_GFF$pp_GFF <- PPt_GFF[1:length(STATION$cast),ii]
   }
   
   else {
-    sacrificial <- data.frame(matrix(cruisename$cruise[ii],ncol = 1, nrow = length(STATION$station)))
+    sacrificial <- data.frame(matrix(cruisename$cruise[ii],ncol = 1, nrow = length(STATION$cast)))
     colnames(sacrificial) <- "cruise"
-    sacrificial$station <- STATION$station
-    sacrificial$pp_less5 <- PPt_less5[1:length(STATION$station),ii]
+    sacrificial$cast <- STATION$cast
+    sacrificial$pp_less5 <- PPt_less5[1:length(STATION$cast),ii]
     
     int_prod_less5 <- rbind(int_prod_less5, sacrificial)
     
-    sacrificial20 <- data.frame(matrix(cruisename$cruise[ii],ncol = 1, nrow = length(STATION$station)))
+    sacrificial20 <- data.frame(matrix(cruisename$cruise[ii],ncol = 1, nrow = length(STATION$cast)))
     colnames(sacrificial20) <- "cruise"
-    sacrificial20$station  <- STATION$station
-    sacrificial20$pp_less_20 <- PPt_less_20[1:length(STATION$station),ii]
+    sacrificial20$cast  <- STATION$cast
+    sacrificial20$pp_less_20 <- PPt_less_20[1:length(STATION$cast),ii]
     
     int_prod_less_20 <- rbind(int_prod_less_20, sacrificial20)
     
-    sacrificial_GFF <- data.frame(matrix(cruisename$cruise[ii],ncol = 1, nrow = length(STATION$station)))
+    sacrificial_GFF <- data.frame(matrix(cruisename$cruise[ii],ncol = 1, nrow = length(STATION$cast)))
     colnames(sacrificial_GFF) <- "cruise"
-    sacrificial_GFF$station <- STATION$station
-    sacrificial_GFF$pp_GFF <- PPt_GFF[1:length(STATION$station),ii]
+    sacrificial_GFF$cast <- STATION$cast
+    sacrificial_GFF$pp_GFF <- PPt_GFF[1:length(STATION$cast),ii]
     
     int_prod_GFF <- rbind(int_prod_GFF, sacrificial_GFF)
   }
@@ -173,8 +171,8 @@ for (ii in 1:length(cruisename$cruise)){
 
 #Now cbind all size dataframes together
 pp_int <- int_prod_GFF %>%
-  left_join(int_prod_less_20, by = c('cruise', 'station')) %>%
-  left_join(int_prod_less5, by = c('cruise', 'station')) %>%
+  left_join(int_prod_less_20, by = c('cruise', 'cast')) %>%
+  left_join(int_prod_less5, by = c('cruise', 'cast')) %>%
   pivot_longer(cols = 'pp_GFF':'pp_less5',
                names_to = 'size',
                values_to = 'npp')
@@ -192,11 +190,11 @@ pp_int$filter_size[pp_int$filter_size == "pp_less_20"] <- ">0&<20"
 # Make stations dataframe to get cast info
 stns <-  pp_filt_noreps %>%
   ungroup()%>%
-  select(cruise, station, cast) %>%
+  select(cruise, cast, station) %>%
   distinct()
 
 pp_int <- pp_int %>%
-  inner_join(stns, by = c("cruise","station"))
+  inner_join(stns, by = c("cruise","cast"))
 
 #Then need date/time and lat/long so use pp dataframe
 lat_lon_date <- pp_for_int %>%
@@ -228,7 +226,7 @@ pp_int <- pp_int %>%
 
 #add beam attenuation information from output files obtained using automated calculations in MATLBAB. See this Github page for more details: https://github.com/pmarrec/nes-lter-kd-calculation. The "extinction coefficient.csv" file is a file made by compiling output files from here: https://github.com/pmarrec/nes-lter-kd-calculation/tree/main/output_files
 ext <- read_csv("extinction_coefficients.csv")
-#remove station
+ #remove station
 ext <- ext %>%
   select(-station)
 

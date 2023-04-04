@@ -43,7 +43,7 @@ filt_blank_noen644 <- filt_blank %>%
 #Add filter_blank values for EN644 cruise that had the contamination issue -- this is just an average of the other cruises without EN644
 filt_blank <- filt_blank_noen644 %>%
   add_row(cruise = "EN644", mean_blank = mean(filt_blank_noen644$mean_blank))  
-
+hist(filt_blank$mean_blank)
  
 #add a column of blank corrected POC values
 npp_discrete <- npp_discrete %>%
@@ -71,7 +71,7 @@ nat <- npp_discrete[str_detect(npp_discrete$alternate_sample_category, "NatAbun"
 
 #use nat to get natural abundance table
 nat_table <- nat %>%
-  select(cruise, cast, station, depth, niskin, alternate_sample_category, filter_size, vol_filt_L, POC_ug_L)
+  select(cruise, cast, station, niskin, alternate_sample_category, filter_size, vol_filt_L, POC_ug_L)
 
 #order cruises and order table by cruise order
 nat_table$cruise <- fct_relevel(nat_table$cruise , c("EN644", "AR39B","EN649", "EN655", "EN657", "EN661", "EN668", "AR61B", "AT46", "EN687"))
@@ -212,8 +212,6 @@ nat_table_complete$latitude <- round(nat_table_complete$latitude , digits = 3)
 nat_table_complete$longitude <- round(nat_table_complete$longitude, digits = 3)
 nat_table_complete$POC_ug_L <- round(nat_table_complete$POC_ug_L, digits = 3)
 
-#now save csv!
-write_csv(nat_table_complete, "POC_Rynearson.csv")
 
 
 #calculations to get to pp rates
@@ -235,12 +233,22 @@ npp_en668_D1_forqual <- npp_calcs %>%
 npp_en668_D1_forqual$iode_quality_flag <- 4
 npp_en668_D1_forqual$pp_rate <- NA
 
+##D3 GFF replicate 3 value from AT46 cast 1, niskin 15 is about double than either of the two replicates, so make this a 3
+
+npp_at46_D3_forqual <- npp_calcs %>%
+  filter(cruise == "AT46" & depth_category == "D3" & cast == "1" & alternate_sample_category == "D3_GFF" & replicate == "3")
+
+npp_at46_D3_forqual$iode_quality_flag <- 3
+
+
+
 
 #rbind dataframe back together and filter out D4 10 exclude row and en668 d6a (cast 20) D1 samples since we binded them together (we don't want duplicate rows for the same samples)
-npp_calcs_joined <- rbind(npp_calcs, npp_en668_D1_forqual)
+npp_calcs_joined <- rbind(npp_calcs, npp_en668_D1_forqual, npp_at46_D3_forqual)
 
 npp_calcs_joined <- npp_calcs_joined %>%
-  filter(!(cruise == "EN668" & cast == "20" & depth_category == "D1" & iode_quality_flag == 1))
+  filter(!(cruise == "EN668" & cast == "20" & depth_category == "D1" & iode_quality_flag == 1)) %>%
+  filter(!(cruise == "AT46" & depth_category == "D3" & cast == "1" & alternate_sample_category == "D3_GFF" & replicate == "3" & iode_quality_flag == 1))
   
 
 ### Using list made above to obtain nearest station info for discrete depth table
@@ -345,6 +353,10 @@ npp_calcs_final_vers1 <- npp_calcs_final_withincub %>%
 npp_calcs_final_vers2 <- npp_calcs_final_withincub%>%
   filter(cruise %in% c("EN655","EN657", "EN661", "EN668", "AR61B", "AT46", "EN687"))
 
+#arrange by cruise 
+cruise_order <- c("EN655", "EN657", "EN661", "EN668", "AR61B", "AT46", "EN687")
+npp_calcs_final_vers2$cruise <- factor(npp_calcs_final_vers2$cruise , levels = cruise_order)
+npp_calcs_final_vers2<- npp_calcs_final_vers2[order(npp_calcs_final_vers2$cruise), ]
 
 
 
